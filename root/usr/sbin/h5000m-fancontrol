@@ -1,0 +1,503 @@
+#!/bin/sh
+
+TAG="h5000m-fancontrol"
+STATE_FILE="/var/run/h5000m-fancontrol.state"
+LOCK_DIR="/var/lock/h5000m-fancontrol.lock"
+
+is_uint() {
+	case "$1" in
+		''|*[!0-9]*) return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+clamp() {
+	local value="$1" min="$2" max="$3"
+	[ "$value" -lt "$min" ] && value="$min"
+	[ "$value" -gt "$max" ] && value="$max"
+	echo "$value"
+}
+
+cfg_uint() {
+	local option="$1" fallback="$2" min="$3" max="$4" value
+	value="$(uci -q get "h5000m_fancontrol.settings.${option}" || true)"
+	is_uint "$value" || value="$fallback"
+	clamp "$value" "$min" "$max"
+}
+
+cfg_string() {
+	local option="$1" fallback="$2" value
+	value="$(uci -q get "h5000m_fancontrol.settings.${option}" || true)"
+	[ -n "$value" ] || value="$fallback"
+	echo "$value"
+}
+
+load_config() {
+	ENABLED="$(cfg_uint enabled 1 0 1)"
+	MODE="$(cfg_string mode auto)"
+	case "$MODE" in auto|manual|kernel) ;; off) MODE="kernel" ;; *) MODE="auto" ;; esac
+	PROFILE="$(cfg_string curve balanced)"
+	case "$PROFILE" in silent|balanced|performance|custom) ;; *) PROFILE="balanced" ;; esac
+	TEMP_SOURCE="$(cfg_string temp_source max)"
+	case "$TEMP_SOURCE" in max|cpu) ;; *) TEMP_SOURCE="max" ;; esac
+	MANUAL_PWM="$(cfg_uint manual_pwm 160 0 255)"
+	INTERVAL="$(cfg_uint interval 5 2 60)"
+	HYSTERESIS="$(cfg_uint hysteresis 2 0 10)"
+	DOWN_DELAY="$(cfg_uint down_delay 30 0 300)"
+	START_PWM="$(cfg_uint start_pwm 192 80 255)"
+	START_BOOST_MS="$(cfg_uint start_boost_ms 700 0 3000)"
+	FAIL_PWM="$(cfg_uint fail_pwm 255 192 255)"
+
+	CURVE_SILENT="$(cfg_string curve_silent '20:0,35:0,40:50,55:50,70:60,85:75,95:100')"
+	CURVE_BALANCED="$(cfg_string curve_balanced '20:0,35:0,40:50,55:60,70:75,85:90,95:100')"
+	CURVE_PERFORMANCE="$(cfg_string curve_performance '20:0,30:60,45:70,60:82,75:92,85:100')"
+	CURVE_CUSTOM="$(cfg_string curve_custom '20:0,40:50,55:60,70:75,85:90,95:100')"
+	case "$PROFILE" in
+		silent) CURVE_DATA="$CURVE_SILENT" ;;
+		performance) CURVE_DATA="$CURVE_PERFORMANCE" ;;
+		custom) CURVE_DATA="$CURVE_CUSTOM" ;;
+		*) CURVE_DATA="$CURVE_BALANCED" ;;
+	esac
+}
+
+find_pwm() {
+	local hwmon pwm name
+	for hwmon in /sys/class/hwmon/hwmon*; do
+		[ -d "$hwmon" ] || continue
+		name="$(cat "$hwmon/name" 2>/dev/null || true)"
+		[ "$name" = "pwmfan" ] || continue
+		pwm="$hwmon/pwm1"
+		[ -e "$pwm" ] && { echo "$pwm"; return 0; }
+	done
+	for pwm in /sys/class/hwmon/hwmon*/pwm1; do
+		[ -e "$pwm" ] && { echo "$pwm"; return 0; }
+	done
+	return 1
+}
+
+find_fan_rpm() {
+	local fan
+	for fan in /sys/class/hwmon/hwmon*/fan*_input; do
+		[ -e "$fan" ] && { echo "$fan"; return 0; }
+	done
+	return 1
+}
+
+read_temp_c() {
+	local value
+	value="$(cat "$1" 2>/dev/null || true)"
+	case "$value" in ''|*[!0-9-]*) return 1 ;; esac
+	if [ "$value" -gt 1000 ] 2>/dev/null || [ "$value" -lt -1000 ] 2>/dev/null; then
+		value=$((value / 1000))
+	fi
+	[ "$value" -ge -40 ] 2>/dev/null && [ "$value" -le 150 ] 2>/dev/null || return 1
+	echo "$value"
+}
+
+find_module_temp() {
+	local file value
+	for file in /tmp/cache_base_info_* /tmp/cache_*info*; do
+		[ -f "$file" ] || continue
+		value="$(sed -n 's/.*"key"[[:space:]]*:[[:space:]]*"temperature"[^}]*"value"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" 2>/dev/null | head -n 1 | grep -Eo -- '-?[0-9]+' | head -n 1)"
+		case "$value" in ''|*[!0-9-]*) continue ;; esac
+		[ "$value" -ge -40 ] 2>/dev/null && [ "$value" -le 150 ] 2>/dev/null || continue
+		echo "$value"
+		return 0
+	done
+	return 1
+}
+
+max_sensor() {
+	local value="$1" label="$2"
+	[ -n "$value" ] || return 0
+	if [ -z "${CONTROL_TEMP:-}" ] || [ "$value" -gt "$CONTROL_TEMP" ]; then
+		CONTROL_TEMP="$value"
+		CONTROL_SENSOR="$label"
+	fi
+}
+
+read_sensors() {
+	local zone type value hwmon name
+	CPU_TEMP=""; CPU_LABEL=""; PHY_TEMP=""; PHY_LABEL=""
+	WIFI1_TEMP=""; WIFI1_LABEL=""; WIFI2_TEMP=""; WIFI2_LABEL=""
+	MODULE_TEMP="$(find_module_temp 2>/dev/null || true)"
+	CONTROL_TEMP=""; CONTROL_SENSOR=""
+
+	for zone in /sys/class/thermal/thermal_zone*; do
+		[ -e "$zone/temp" ] || continue
+		type="$(cat "$zone/type" 2>/dev/null || true)"
+		value="$(read_temp_c "$zone/temp" 2>/dev/null || true)"
+		[ -n "$value" ] || continue
+		case "$(printf '%s' "$type" | tr 'A-Z' 'a-z')" in
+			*cpu*|*soc*|*mt798*|*thermal*)
+				[ -n "$CPU_TEMP" ] || { CPU_TEMP="$value"; CPU_LABEL="$type"; }
+				;;
+		esac
+	done
+
+	for hwmon in /sys/class/hwmon/hwmon*; do
+		[ -d "$hwmon" ] || continue
+		name="$(cat "$hwmon/name" 2>/dev/null || true)"
+		value="$(read_temp_c "$hwmon/temp1_input" 2>/dev/null || true)"
+		[ -n "$value" ] || continue
+		case "$(printf '%s' "$name" | tr 'A-Z' 'a-z')" in
+			*cpu*|*soc*|*mt798*|*thermal*)
+				[ -n "$CPU_TEMP" ] || { CPU_TEMP="$value"; CPU_LABEL="$name"; }
+				;;
+			*mt799*|*wifi*|*radio*)
+				if [ -z "$WIFI1_TEMP" ]; then
+					WIFI1_TEMP="$value"; WIFI1_LABEL="$name"
+				elif [ -z "$WIFI2_TEMP" ]; then
+					WIFI2_TEMP="$value"; WIFI2_LABEL="$name"
+				fi
+				;;
+			*mdio*|*phy*)
+				[ -n "$PHY_TEMP" ] || { PHY_TEMP="$value"; PHY_LABEL="$name"; }
+				;;
+		esac
+	done
+
+	max_sensor "$CPU_TEMP" "${CPU_LABEL:-CPU}"
+	if [ "$TEMP_SOURCE" = "max" ]; then
+		max_sensor "$PHY_TEMP" "${PHY_LABEL:-PHY}"
+		max_sensor "$WIFI1_TEMP" "${WIFI1_LABEL:-WiFi 1}"
+		max_sensor "$WIFI2_TEMP" "${WIFI2_LABEL:-WiFi 2}"
+		max_sensor "$MODULE_TEMP" "5G modem"
+	fi
+}
+
+cooling_device_path() {
+	local dev
+	for dev in /sys/class/thermal/cooling_device*; do
+		[ -d "$dev" ] || continue
+		[ "$(cat "$dev/type" 2>/dev/null || true)" = "pwm-fan" ] && { echo "$dev"; return 0; }
+	done
+	return 1
+}
+
+read_be32() {
+	local file="$1" skip="${2:-0}" hex value
+	hex="$(dd if="$file" bs=4 skip="$skip" count=1 2>/dev/null | hexdump -v -e '1/1 "%02x"')"
+	case "$hex" in
+		????????) value="$(printf '%d' "0x$hex" 2>/dev/null || true)" ;;
+		*) value="" ;;
+	esac
+	is_uint "$value" || return 1
+	echo "$value"
+}
+
+cooling_level_for_state() {
+	local state="$1" levels value
+	levels="$(readlink -f "$(dirname "$PWM_PATH")/device/of_node/cooling-levels" 2>/dev/null || true)"
+	[ -f "$levels" ] || levels="/sys/firmware/devicetree/base/pwm-fan/cooling-levels"
+	[ -f "$levels" ] || return 1
+	value="$(read_be32 "$levels" "$state" 2>/dev/null || true)"
+	is_uint "$value" && [ "$value" -le 255 ] || return 1
+	echo "$value"
+}
+
+set_thermal_floor() {
+	local dev dt fan_phandle map map_phandle map_state trip_ref trip threshold hyst trip_phandle value maps_examined map_found
+	THERMAL_FLOOR=0
+	THERMAL_STATE=0
+	THERMAL_MAX_STATE=0
+	THERMAL_OWNER="unknown"
+	dev="$(cooling_device_path 2>/dev/null || true)"
+	[ -n "$dev" ] || return 0
+	THERMAL_MAX_STATE="$(cat "$dev/max_state" 2>/dev/null || echo 0)"
+	is_uint "$THERMAL_MAX_STATE" || THERMAL_MAX_STATE=0
+
+	dt="$(readlink -f "$(dirname "$PWM_PATH")/device/of_node" 2>/dev/null || true)"
+	[ -d "$dt" ] || dt="/sys/firmware/devicetree/base/pwm-fan"
+	fan_phandle="$(read_be32 "$dt/phandle" 2>/dev/null || true)"
+	maps_examined=0
+	map_found=0
+
+	# Derive the required state from the kernel's own cooling maps. Direct PWM
+	# writes also change cur_state, so cur_state itself is not a safe floor.
+	if is_uint "$fan_phandle"; then
+		for map in /sys/firmware/devicetree/base/thermal-zones/*/cooling-maps/*; do
+			[ -f "$map/cooling-device" ] && [ -f "$map/trip" ] || continue
+			map_phandle="$(read_be32 "$map/cooling-device" 0 2>/dev/null || true)"
+			is_uint "$map_phandle" || continue
+			maps_examined=1
+			[ "$map_phandle" = "$fan_phandle" ] || continue
+			map_found=1
+			map_state="$(read_be32 "$map/cooling-device" 2 2>/dev/null || true)"
+			trip_ref="$(read_be32 "$map/trip" 0 2>/dev/null || true)"
+			is_uint "$map_state" && is_uint "$trip_ref" || continue
+			for trip in /sys/firmware/devicetree/base/thermal-zones/*/trips/*; do
+				[ -f "$trip/phandle" ] && [ -f "$trip/temperature" ] || continue
+				trip_phandle="$(read_be32 "$trip/phandle" 0 2>/dev/null || true)"
+				[ "$trip_phandle" = "$trip_ref" ] || continue
+				threshold="$(read_be32 "$trip/temperature" 0 2>/dev/null || true)"
+				hyst="$(read_be32 "$trip/hysteresis" 0 2>/dev/null || echo 0)"
+				is_uint "$threshold" || continue
+				threshold=$((threshold / 1000)); is_uint "$hyst" || hyst=0; hyst=$((hyst / 1000))
+				if [ "$CPU_TEMP" -ge "$((threshold - hyst))" ] && [ "$map_state" -gt "$THERMAL_STATE" ]; then
+					THERMAL_STATE="$map_state"
+				fi
+				done
+		done
+	fi
+	if [ "$maps_examined" -eq 1 ] && [ "$map_found" -eq 0 ]; then
+		THERMAL_OWNER="userspace"
+		# The old 40 C active map made useful low-speed control impossible. In
+		# exclusive mode retain only the high-temperature emergency floors.
+		[ -n "$CPU_TEMP" ] || { THERMAL_STATE=3; THERMAL_FLOOR=255; return 0; }
+		[ "$CPU_TEMP" -ge 83 ] && THERMAL_STATE=2
+		[ "$CPU_TEMP" -ge 113 ] && THERMAL_STATE=3
+		if [ "$THERMAL_STATE" -gt 0 ]; then
+			value="$(cooling_level_for_state "$THERMAL_STATE" 2>/dev/null || true)"
+			if is_uint "$value"; then THERMAL_FLOOR="$value"; else THERMAL_FLOOR=255; fi
+		fi
+		return 0
+	fi
+	[ "$map_found" -eq 1 ] && THERMAL_OWNER="shared"
+	[ -n "$CPU_TEMP" ] || { THERMAL_FLOOR=255; return 0; }
+
+	# Conservative fallback for old H5000M firmware if DT discovery fails.
+	if [ "$THERMAL_STATE" -eq 0 ]; then
+		[ "$CPU_TEMP" -ge 38 ] && THERMAL_STATE=1
+		[ "$CPU_TEMP" -ge 83 ] && THERMAL_STATE=2
+		[ "$CPU_TEMP" -ge 113 ] && THERMAL_STATE=3
+	fi
+	[ "$THERMAL_STATE" -gt 0 ] || return 0
+	value="$(cooling_level_for_state "$THERMAL_STATE" 2>/dev/null || true)"
+	if is_uint "$value"; then THERMAL_FLOOR="$value"; else THERMAL_FLOOR=255; fi
+}
+
+acquire_lock() {
+	local owner
+	if mkdir "$LOCK_DIR" 2>/dev/null; then
+		echo "$$" > "$LOCK_DIR/pid"
+		return 0
+	fi
+	owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+	if ! is_uint "$owner" || ! kill -0 "$owner" 2>/dev/null; then
+		rm -rf "$LOCK_DIR" 2>/dev/null
+		mkdir "$LOCK_DIR" 2>/dev/null || return 1
+		echo "$$" > "$LOCK_DIR/pid"
+		return 0
+	fi
+	return 1
+}
+
+release_lock() {
+	rm -rf "$LOCK_DIR" 2>/dev/null
+}
+
+calc_curve_pwm() {
+	local temp="$1" curve="$2" old_ifs point t p prev_t prev_p result
+	old_ifs="$IFS"; IFS=','
+	for point in $curve; do
+		t="${point%%:*}"; p="${point#*:}"
+		is_uint "$t" && is_uint "$p" && [ "$t" -le 150 ] && [ "$p" -le 100 ] || { IFS="$old_ifs"; return 1; }
+		if [ -n "${prev_t:-}" ] && [ "$t" -le "$prev_t" ]; then IFS="$old_ifs"; return 1; fi
+		if [ "$temp" -le "$t" ]; then
+			if [ -z "${prev_t:-}" ]; then
+				result="$p"
+			else
+				result=$((prev_p + (temp - prev_t) * (p - prev_p) / (t - prev_t)))
+			fi
+			IFS="$old_ifs"
+			echo $((result * 255 / 100))
+			return 0
+		fi
+		prev_t="$t"; prev_p="$p"
+	done
+	IFS="$old_ifs"
+	[ -n "${prev_p:-}" ] || return 1
+	echo $((prev_p * 255 / 100))
+}
+
+state_get() {
+	local key="$1"
+	[ -f "$STATE_FILE" ] || return 0
+	sed -n "s/^${key}=//p" "$STATE_FILE" 2>/dev/null | head -n 1
+}
+
+write_state() {
+	local tmp="${STATE_FILE}.$$"
+	{
+		echo "updated=$(date +%s)"
+		echo "result=$RESULT"
+		echo "reason=$REASON"
+		echo "requested_pwm=$REQUESTED_PWM"
+		echo "target_pwm=$TARGET_PWM"
+		echo "applied_pwm=$APPLIED_PWM"
+		echo "thermal_floor=$THERMAL_FLOOR"
+		echo "thermal_state=$THERMAL_STATE"
+		echo "thermal_max_state=$THERMAL_MAX_STATE"
+		echo "thermal_owner=$THERMAL_OWNER"
+		echo "control_temp=${CONTROL_TEMP:-}"
+		echo "control_sensor=${CONTROL_SENSOR:-}"
+		echo "down_since=${DOWN_SINCE:-0}"
+	} > "$tmp" && mv "$tmp" "$STATE_FILE"
+}
+
+apply_once() {
+	local current last_pwm candidate now elapsed sleep_s previous_result
+	load_config
+	PWM_PATH="$(find_pwm 2>/dev/null || true)"
+	if [ -z "$PWM_PATH" ]; then
+		logger -t "$TAG" "PWM control node not found; unable to apply policy"
+		return 1
+	fi
+
+	read_sensors
+	set_thermal_floor
+	REQUESTED_PWM=0; REASON="$MODE"; RESULT="ok"; DOWN_SINCE=0
+
+	if [ "$ENABLED" != "1" ] || [ "$MODE" = "kernel" ]; then
+		REQUESTED_PWM=0
+		REASON="kernel"
+	elif [ "$MODE" = "manual" ]; then
+		REQUESTED_PWM="$MANUAL_PWM"
+		REASON="manual"
+	elif [ -z "$CONTROL_TEMP" ]; then
+		REQUESTED_PWM="$FAIL_PWM"
+		REASON="sensor-failsafe"
+		RESULT="failsafe"
+	else
+		REQUESTED_PWM="$(calc_curve_pwm "$CONTROL_TEMP" "$CURVE_DATA" 2>/dev/null || true)"
+		if ! is_uint "$REQUESTED_PWM"; then
+			REQUESTED_PWM="$FAIL_PWM"
+			REASON="curve-failsafe"
+			RESULT="failsafe"
+		else
+			REASON="auto"
+		fi
+	fi
+
+	REQUESTED_PWM="$(clamp "$REQUESTED_PWM" 0 255)"
+	TARGET_PWM="$REQUESTED_PWM"
+	[ "$THERMAL_FLOOR" -gt "$TARGET_PWM" ] && { TARGET_PWM="$THERMAL_FLOOR"; REASON="${REASON}+kernel-floor"; }
+
+	current="$(cat "$PWM_PATH" 2>/dev/null || true)"
+	is_uint "$current" || current=0
+	last_pwm="$(state_get applied_pwm)"; is_uint "$last_pwm" || last_pwm="$current"
+	now="$(date +%s)"
+
+	if [ "$MODE" = "auto" ] && [ "$RESULT" = "ok" ] && [ "$TARGET_PWM" -lt "$last_pwm" ]; then
+		candidate="$(calc_curve_pwm "$((CONTROL_TEMP + HYSTERESIS))" "$CURVE_DATA" 2>/dev/null || echo "$TARGET_PWM")"
+		is_uint "$candidate" || candidate="$TARGET_PWM"
+		[ "$THERMAL_FLOOR" -gt "$candidate" ] && candidate="$THERMAL_FLOOR"
+		TARGET_PWM="$candidate"
+		DOWN_SINCE="$(state_get down_since)"; is_uint "$DOWN_SINCE" || DOWN_SINCE=0
+		[ "$DOWN_SINCE" -gt 0 ] || DOWN_SINCE="$now"
+		elapsed=$((now - DOWN_SINCE))
+		if [ "$elapsed" -lt "$DOWN_DELAY" ]; then
+			TARGET_PWM="$last_pwm"
+			REASON="auto-down-delay"
+		else
+			DOWN_SINCE=0
+		fi
+	fi
+
+	TARGET_PWM="$(clamp "$TARGET_PWM" 0 255)"
+	if [ "$current" -eq 0 ] && [ "$TARGET_PWM" -gt 0 ] && [ "$START_BOOST_MS" -gt 0 ]; then
+		candidate="$START_PWM"; [ "$TARGET_PWM" -gt "$candidate" ] && candidate="$TARGET_PWM"
+		echo "$candidate" > "$PWM_PATH" 2>/dev/null || return 1
+		sleep_s="$(printf '%d.%03d' $((START_BOOST_MS / 1000)) $((START_BOOST_MS % 1000)))"
+		sleep "$sleep_s"
+	fi
+
+	if [ "$current" -ne "$TARGET_PWM" ]; then
+		if ! echo "$TARGET_PWM" > "$PWM_PATH" 2>/dev/null; then
+			logger -t "$TAG" "failed to set PWM target=$TARGET_PWM"
+			return 1
+		fi
+	fi
+	APPLIED_PWM="$TARGET_PWM"
+	previous_result="$(state_get result)"
+	if [ "$RESULT" != "$previous_result" ]; then
+		if [ "$RESULT" = "failsafe" ]; then
+			logger -t "$TAG" "failsafe enabled reason=$REASON pwm=$TARGET_PWM"
+		elif [ "$previous_result" = "failsafe" ]; then
+			logger -t "$TAG" "sensor and curve validation recovered; normal control resumed"
+		fi
+	fi
+	write_state
+	return 0
+}
+
+print_settings() {
+	echo "enabled=$ENABLED"
+	echo "mode=$MODE"
+	echo "curve=$PROFILE"
+	echo "curve_data=$CURVE_DATA"
+	echo "temp_source=$TEMP_SOURCE"
+	echo "manual_pwm=$MANUAL_PWM"
+	echo "interval=$INTERVAL"
+	echo "hysteresis=$HYSTERESIS"
+	echo "down_delay=$DOWN_DELAY"
+	echo "start_pwm=$START_PWM"
+	echo "start_boost_ms=$START_BOOST_MS"
+}
+
+print_status() {
+	local fan updated now age
+	load_config
+	PWM_PATH="$(find_pwm 2>/dev/null || true)"
+	read_sensors
+	THERMAL_FLOOR=0; THERMAL_STATE=0; THERMAL_MAX_STATE=0; THERMAL_OWNER="unknown"
+	[ -n "$PWM_PATH" ] && set_thermal_floor
+	print_settings
+	echo "pwm=${PWM_PATH:-}"
+	echo "pwm_value=$([ -n "$PWM_PATH" ] && cat "$PWM_PATH" 2>/dev/null || true)"
+	fan="$(find_fan_rpm 2>/dev/null || true)"
+	echo "fan=${fan:-}"
+	if [ -n "$fan" ]; then
+		echo "fan_feedback=1"
+		echo "fan_rpm=$(cat "$fan" 2>/dev/null || true)"
+	else
+		echo "fan_feedback=0"
+		echo "fan_rpm="
+	fi
+	echo "cpu_temp=$CPU_TEMP"; echo "cpu_label=$CPU_LABEL"
+	echo "phy_temp=$PHY_TEMP"; echo "phy_label=$PHY_LABEL"
+	echo "wifi1_temp=$WIFI1_TEMP"; echo "wifi1_label=$WIFI1_LABEL"
+	echo "wifi2_temp=$WIFI2_TEMP"; echo "wifi2_label=$WIFI2_LABEL"
+	echo "module_temp=$MODULE_TEMP"; echo "module_label=5G modem"
+	echo "control_temp=$CONTROL_TEMP"; echo "control_sensor=$CONTROL_SENSOR"
+	echo "thermal_floor=$THERMAL_FLOOR"
+	echo "thermal_state=$THERMAL_STATE"
+	echo "thermal_max_state=$THERMAL_MAX_STATE"
+	echo "thermal_owner=$THERMAL_OWNER"
+	for key in result reason requested_pwm target_pwm applied_pwm; do
+		echo "$key=$(state_get "$key")"
+	done
+	updated="$(state_get updated)"; now="$(date +%s)"
+	if is_uint "$updated"; then age=$((now - updated)); else age=""; fi
+	echo "state_age=$age"
+}
+
+run_daemon() {
+	trap 'exit 0' TERM INT
+	while true; do
+		if acquire_lock; then
+			trap 'release_lock; exit 0' TERM INT
+			apply_once
+			release_lock
+			trap 'exit 0' TERM INT
+		fi
+		load_config
+		sleep "$INTERVAL" & wait $!
+	done
+}
+
+case "${1:-apply}" in
+	apply)
+		if acquire_lock; then
+			trap 'release_lock' EXIT
+			apply_once
+		else
+			echo "fan control is busy" >&2
+			exit 1
+		fi
+		;;
+	status) print_status ;;
+	daemon) run_daemon ;;
+	*) echo "Usage: $0 {apply|status|daemon}"; exit 1 ;;
+esac

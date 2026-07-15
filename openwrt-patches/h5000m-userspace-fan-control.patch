@@ -1,0 +1,18 @@
+diff --git a/target/linux/mediatek/dts/mt7987a-hiveton-h5000m.dts b/target/linux/mediatek/dts/mt7987a-hiveton-h5000m.dts
+--- a/target/linux/mediatek/dts/mt7987a-hiveton-h5000m.dts
++++ b/target/linux/mediatek/dts/mt7987a-hiveton-h5000m.dts
+@@ -100,3 +100,14 @@
+ };
+ 
++/*
++ * Fan policy is managed by luci-app-h5000m-fancontrol. Keep the CPU cooling,
++ * hot and critical trips intact, but prevent the thermal governor from racing
++ * userspace for the same PWM output.
++ */
++&{/thermal-zones/cpu-thermal/cooling-maps} {
++	/delete-node/ cpu-active-high;
++	/delete-node/ cpu-active-low;
++	/delete-node/ cpu-passive;
++};
++
+ &gmac0 {

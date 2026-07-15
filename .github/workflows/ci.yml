@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y gettext
+
+      - name: Check shell syntax
+        run: |
+          sh -n root/usr/sbin/h5000m-fancontrol
+          sh -n root/etc/init.d/h5000m-fancontrol
+          sh -n root/etc/uci-defaults/91-h5000m-fancontrol-v2
+
+      - name: Check LuCI JavaScript syntax
+        run: node --check htdocs/luci-static/resources/view/h5000m/fancontrol.js
+
+      - name: Validate JSON metadata
+        run: |
+          jq empty root/usr/share/luci/menu.d/luci-app-h5000m-fancontrol.json
+          jq empty root/usr/share/rpcd/acl.d/luci-app-h5000m-fancontrol.json
+
+      - name: Validate translations
+        run: msgfmt --check --check-format -o /dev/null po/zh_Hans/h5000m-fancontrol.po
+
+      - name: Check patch format
+        run: git apply --numstat openwrt-patches/h5000m-userspace-fan-control.patch

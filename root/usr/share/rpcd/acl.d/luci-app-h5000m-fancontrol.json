@@ -1,0 +1,18 @@
+{
+	"luci-app-h5000m-fancontrol": {
+		"description": "Grant access to H5000M fan control",
+		"read": {
+			"file": {
+				"/usr/sbin/h5000m-fancontrol": [ "exec" ]
+			},
+			"uci": [ "h5000m_fancontrol" ]
+		},
+		"write": {
+			"file": {
+				"/usr/sbin/h5000m-fancontrol": [ "exec" ],
+				"/etc/init.d/h5000m-fancontrol": [ "exec" ]
+			},
+			"uci": [ "h5000m_fancontrol" ]
+		}
+	}
+}

@@ -1,0 +1,14 @@
+{
+	"admin/system/h5000m_fancontrol": {
+		"title": "Fan Control",
+		"order": 90,
+		"action": {
+			"type": "view",
+			"path": "h5000m/fancontrol"
+		},
+		"depends": {
+			"acl": [ "luci-app-h5000m-fancontrol" ],
+			"uci": { "h5000m_fancontrol": true }
+		}
+	}
+}

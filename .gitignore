@@ -1,0 +1,9 @@
+*.apk
+*.ipk
+*.o
+*.so
+*.swp
+.DS_Store
+/bin/
+/build/
+/dist/
