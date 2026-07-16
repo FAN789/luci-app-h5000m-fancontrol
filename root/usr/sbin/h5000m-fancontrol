@@ -2,6 +2,7 @@
 
 TAG="h5000m-fancontrol"
 STATE_FILE="/var/run/h5000m-fancontrol.state"
+POLICY_FILE="/var/run/h5000m-fancontrol.policy"
 LOCK_DIR="/var/lock/h5000m-fancontrol.lock"
 
 is_uint() {
@@ -81,6 +82,67 @@ find_fan_rpm() {
 		[ -e "$fan" ] && { echo "$fan"; return 0; }
 	done
 	return 1
+}
+
+find_thermal_zone() {
+	local zone policies type fallback
+	fallback=""
+	for zone in /sys/class/thermal/thermal_zone*; do
+		[ -r "$zone/policy" ] && [ -r "$zone/available_policies" ] || continue
+		policies="$(cat "$zone/available_policies" 2>/dev/null || true)"
+		case " $policies " in *" user_space "*) ;; *) continue ;; esac
+		[ -n "$fallback" ] || fallback="$zone"
+		type="$(cat "$zone/type" 2>/dev/null || true)"
+		case "$(printf '%s' "$type" | tr 'A-Z' 'a-z')" in
+			*cpu*|*soc*|*mt798*) echo "$zone"; return 0 ;;
+		esac
+	done
+	[ -n "$fallback" ] && { echo "$fallback"; return 0; }
+	return 1
+}
+
+take_thermal_control() {
+	local zone policy saved_zone saved_policy tmp
+	zone="$(find_thermal_zone 2>/dev/null || true)"
+	[ -n "$zone" ] || return 1
+	policy="$(cat "$zone/policy" 2>/dev/null || true)"
+	[ -n "$policy" ] || return 1
+
+	if [ -f "$POLICY_FILE" ]; then
+		saved_zone="$(sed -n '1p' "$POLICY_FILE" 2>/dev/null || true)"
+		saved_policy="$(sed -n '2p' "$POLICY_FILE" 2>/dev/null || true)"
+	else
+		saved_zone=""; saved_policy=""
+	fi
+	if [ "$saved_zone" != "$zone" ] || [ -z "$saved_policy" ]; then
+		[ "$policy" != "user_space" ] || policy="step_wise"
+		tmp="${POLICY_FILE}.$$"
+		{ echo "$zone"; echo "$policy"; } > "$tmp" && mv "$tmp" "$POLICY_FILE" || return 1
+	fi
+
+	if [ "$(cat "$zone/policy" 2>/dev/null || true)" != "user_space" ]; then
+		echo user_space > "$zone/policy" 2>/dev/null || return 1
+	fi
+	CONTROL_ZONE="$zone"
+	CONTROL_POLICY="user_space"
+	return 0
+}
+
+release_thermal_control() {
+	local zone policy available
+	[ -f "$POLICY_FILE" ] || return 0
+	zone="$(sed -n '1p' "$POLICY_FILE" 2>/dev/null || true)"
+	policy="$(sed -n '2p' "$POLICY_FILE" 2>/dev/null || true)"
+	if [ -r "$zone/policy" ]; then
+		available="$(cat "$zone/available_policies" 2>/dev/null || true)"
+		case " $available " in
+			*" $policy "*) ;;
+			*" step_wise "*) policy="step_wise" ;;
+			*) policy="" ;;
+		esac
+		[ -z "$policy" ] || echo "$policy" > "$zone/policy" 2>/dev/null || true
+	fi
+	rm -f "$POLICY_FILE"
 }
 
 read_temp_c() {
@@ -350,9 +412,24 @@ apply_once() {
 	REQUESTED_PWM=0; REASON="$MODE"; RESULT="ok"; DOWN_SINCE=0
 
 	if [ "$ENABLED" != "1" ] || [ "$MODE" = "kernel" ]; then
-		REQUESTED_PWM=0
+		release_thermal_control
+		current="$(cat "$PWM_PATH" 2>/dev/null || true)"
+		is_uint "$current" || current=0
+		REQUESTED_PWM=0; TARGET_PWM="$current"; APPLIED_PWM="$current"
 		REASON="kernel"
-	elif [ "$MODE" = "manual" ]; then
+		THERMAL_OWNER="kernel"
+		write_state
+		return 0
+	fi
+
+	if ! take_thermal_control; then
+		logger -t "$TAG" "unable to acquire userspace thermal policy; kernel control retained"
+		release_thermal_control
+		return 1
+	fi
+	THERMAL_OWNER="userspace"
+
+	if [ "$MODE" = "manual" ]; then
 		REQUESTED_PWM="$MANUAL_PWM"
 		REASON="manual"
 	elif [ -z "$CONTROL_TEMP" ]; then
@@ -399,7 +476,8 @@ apply_once() {
 	if [ "$current" -eq 0 ] && [ "$TARGET_PWM" -gt 0 ] && [ "$START_BOOST_MS" -gt 0 ]; then
 		candidate="$START_PWM"; [ "$TARGET_PWM" -gt "$candidate" ] && candidate="$TARGET_PWM"
 		echo "$candidate" > "$PWM_PATH" 2>/dev/null || return 1
-		sleep_s="$(printf '%d.%03d' $((START_BOOST_MS / 1000)) $((START_BOOST_MS % 1000)))"
+		# BusyBox sleep in official snapshots accepts integer seconds only.
+		sleep_s=$(((START_BOOST_MS + 999) / 1000))
 		sleep "$sleep_s"
 	fi
 
@@ -409,7 +487,8 @@ apply_once() {
 			return 1
 		fi
 	fi
-	APPLIED_PWM="$TARGET_PWM"
+	APPLIED_PWM="$(cat "$PWM_PATH" 2>/dev/null || true)"
+	is_uint "$APPLIED_PWM" || APPLIED_PWM="$TARGET_PWM"
 	previous_result="$(state_get result)"
 	if [ "$RESULT" != "$previous_result" ]; then
 		if [ "$RESULT" = "failsafe" ]; then
@@ -437,12 +516,19 @@ print_settings() {
 }
 
 print_status() {
-	local fan updated now age
+	local fan updated now age zone policy
 	load_config
 	PWM_PATH="$(find_pwm 2>/dev/null || true)"
 	read_sensors
 	THERMAL_FLOOR=0; THERMAL_STATE=0; THERMAL_MAX_STATE=0; THERMAL_OWNER="unknown"
 	[ -n "$PWM_PATH" ] && set_thermal_floor
+	zone="$(find_thermal_zone 2>/dev/null || true)"
+	policy="$([ -n "$zone" ] && cat "$zone/policy" 2>/dev/null || true)"
+	if [ "$policy" = "user_space" ]; then
+		THERMAL_OWNER="userspace"
+	elif [ "$ENABLED" != "1" ] || [ "$MODE" = "kernel" ]; then
+		THERMAL_OWNER="kernel"
+	fi
 	print_settings
 	echo "pwm=${PWM_PATH:-}"
 	echo "pwm_value=$([ -n "$PWM_PATH" ] && cat "$PWM_PATH" 2>/dev/null || true)"
@@ -475,12 +561,11 @@ print_status() {
 
 run_daemon() {
 	trap 'exit 0' TERM INT
+	trap 'release_lock; release_thermal_control' EXIT
 	while true; do
 		if acquire_lock; then
-			trap 'release_lock; exit 0' TERM INT
 			apply_once
 			release_lock
-			trap 'exit 0' TERM INT
 		fi
 		load_config
 		sleep "$INTERVAL" & wait $!
@@ -499,5 +584,6 @@ case "${1:-apply}" in
 		;;
 	status) print_status ;;
 	daemon) run_daemon ;;
-	*) echo "Usage: $0 {apply|status|daemon}"; exit 1 ;;
+	release) release_thermal_control ;;
+	*) echo "Usage: $0 {apply|status|daemon|release}"; exit 1 ;;
 esac

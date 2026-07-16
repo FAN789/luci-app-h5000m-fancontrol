@@ -1,6 +1,7 @@
 # H5000M Fan Control
 
 [![CI](https://github.com/FAN789/luci-app-h5000m-fancontrol/actions/workflows/ci.yml/badge.svg)](https://github.com/FAN789/luci-app-h5000m-fancontrol/actions/workflows/ci.yml)
+[![Build Release](https://github.com/FAN789/luci-app-h5000m-fancontrol/actions/workflows/release.yml/badge.svg)](https://github.com/FAN789/luci-app-h5000m-fancontrol/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 面向 Hiveton H5000M 的 OpenWrt LuCI 风扇管理器。它提供温度监控、自动风扇曲线、手动 PWM、启停助推、温度滞回、降速延迟和传感器故障保护，并保留内核的 CPU 降频、高温及临界过热保护。
@@ -42,7 +43,10 @@ make menuconfig
 make package/luci-app-h5000m-fancontrol/compile V=s
 ```
 
-GitHub Releases 中的预编译 `.apk` 适用于使用 APK 包管理器的近期 OpenWrt SNAPSHOT。由于风扇安全策略依赖设备树，建议把本项目集成进固件并同时评估下方补丁，而不是只安装软件包。
+GitHub Releases 中的预编译 `.apk` 由 GitHub Actions 使用官方 OpenWrt
+SNAPSHOT `mediatek/filogic` SDK 构建，适用于同一 ABI 的近期 SNAPSHOT。Release
+同时提供构建公钥和 SHA256 校验文件。由于风扇安全策略依赖设备树，建议把本项目
+集成进固件并同时评估下方补丁，而不是只安装软件包。
 
 ## 独占风扇策略控制
 

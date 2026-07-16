@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-h5000m-fancontrol
 PKG_VERSION:=2.0.0
-PKG_RELEASE:=4
+PKG_RELEASE:=6
 PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
 
