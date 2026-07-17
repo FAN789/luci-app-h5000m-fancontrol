@@ -22,6 +22,7 @@ jobs:
           sh -n root/etc/init.d/h5000m-fancontrol
           sh -n root/etc/uci-defaults/91-h5000m-fancontrol-v2
           sh -n scripts/build-release.sh
+          sh tests/test-module-temperature.sh
 
       - name: Check LuCI JavaScript syntax
         run: node --check htdocs/luci-static/resources/view/h5000m/fancontrol.js
