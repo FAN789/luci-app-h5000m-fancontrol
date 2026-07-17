@@ -9,13 +9,13 @@
 > H5000M fan manager for OpenWrt with temperature-aware profiles, manual PWM control, hysteresis, delayed spin-down, start boost and sensor failsafe protection.
 
 版本采用标准的 `主版本.次版本.修订版本-r打包修订` 格式。GitHub Release 仅使用
-语义版本标签（当前为 `v2.0.1`），OpenWrt 安装包版本为 `2.0.1-r1`。
+语义版本标签（当前为 `v2.0.2`），OpenWrt 安装包版本为 `2.0.2-r1`。
 
 ![散热管理界面](docs/fan-control-ui.jpg)
 
 ## 功能
 
-- 汇总 CPU、以太网 PHY、Wi-Fi 射频及可用的 5G 模块缓存温度
+- 汇总 CPU、以太网 PHY、Wi-Fi 射频及 MT5700M 管理器提供的新鲜缓存温度
 - 静音、均衡、性能和自定义四种自动曲线
 - 自动、手动和仅内核保护三种运行模式
 - 温度滞回及降速延迟，减少风扇频繁波动

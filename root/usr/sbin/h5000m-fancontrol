@@ -4,6 +4,8 @@ TAG="h5000m-fancontrol"
 STATE_FILE="/var/run/h5000m-fancontrol.state"
 POLICY_FILE="/var/run/h5000m-fancontrol.policy"
 LOCK_DIR="/var/lock/h5000m-fancontrol.lock"
+MT5700M_TEMP_CACHE="${H5000M_FAN_MT5700M_TEMP_CACHE:-/var/run/mt5700m/temperature}"
+MT5700M_TEMP_MAX_AGE="${H5000M_FAN_MT5700M_TEMP_MAX_AGE:-60}"
 
 is_uint() {
 	case "$1" in
@@ -157,7 +159,25 @@ read_temp_c() {
 }
 
 find_module_temp() {
-	local file value
+	local file value updated now age
+	if [ -r "$MT5700M_TEMP_CACHE" ]; then
+		updated="$(sed -n 's/^updated=//p' "$MT5700M_TEMP_CACHE" 2>/dev/null | head -n 1)"
+		now="$(date +%s)"
+		if is_uint "$updated" && is_uint "$now" && is_uint "$MT5700M_TEMP_MAX_AGE"; then
+			age=$((now - updated))
+			if [ "$age" -ge 0 ] && [ "$age" -le "$MT5700M_TEMP_MAX_AGE" ]; then
+				value="$(awk -F= '$1 == "temperature" && $2 ~ /^-?[0-9]+([.][0-9]+)?$/ {
+					v = $2 + 0
+					if (v >= -40 && v <= 150) printf "%d\n", (v < 0 ? v - 0.5 : v + 0.5)
+					exit
+				}' "$MT5700M_TEMP_CACHE" 2>/dev/null)"
+				case "$value" in
+					''|*[!0-9-]*) ;;
+					*) echo "$value"; return 0 ;;
+				esac
+			fi
+		fi
+	fi
 	for file in /tmp/cache_base_info_* /tmp/cache_*info*; do
 		[ -f "$file" ] || continue
 		value="$(sed -n 's/.*"key"[[:space:]]*:[[:space:]]*"temperature"[^}]*"value"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" 2>/dev/null | head -n 1 | grep -Eo -- '-?[0-9]+' | head -n 1)"
