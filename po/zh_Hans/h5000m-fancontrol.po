@@ -342,3 +342,18 @@ msgstr "曲线故障保护"
 
 msgid "%s · modem throttling"
 msgstr "%s · 模块降频"
+
+msgid "Normal"
+msgstr "正常"
+
+msgid "Warm"
+msgstr "偏热"
+
+msgid "Hot"
+msgstr "过热"
+
+msgid "Critical"
+msgstr "严重过热"
+
+msgid "Throttling level %s / 3"
+msgstr "降频等级 %s / 3"

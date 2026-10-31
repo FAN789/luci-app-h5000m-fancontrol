@@ -239,7 +239,10 @@ return view.extend({
 		this.setText('h5fan-phy-value', this.formatTemp(data.phy_temp)); this.setText('h5fan-phy-hint', data.phy_label || '');
 		this.setText('h5fan-wifi-value', data.wifi1_temp || data.wifi2_temp ? [data.wifi1_temp, data.wifi2_temp].filter(Boolean).join(' / ') + ' °C' : _('Unavailable'));
 		this.setText('h5fan-wifi-hint', [data.wifi1_label, data.wifi2_label].filter(Boolean).join(' · '));
-		this.setText('h5fan-modem-value', this.formatTemp(data.module_temp)); this.setText('h5fan-modem-hint', _('From the local modem cache'));
+		var therm = parseInt(data.module_therm, 10);
+		var thermName = therm >= 0 && therm <= 3 ? [ _('Normal'), _('Warm'), _('Hot'), _('Critical') ][therm] : '';
+		this.setText('h5fan-modem-value', data.module_temp === undefined || data.module_temp === '' ? (thermName || _('Unavailable')) : this.formatTemp(data.module_temp));
+		this.setText('h5fan-modem-hint', thermName ? _('Throttling level %s / 3').format(therm) : _('From the local modem cache'));
 		this.setText('h5fan-profile', this.modeName(data.mode) + (data.mode === 'auto' ? ' · ' + this.profileName(data.curve) : ''));
 		this.setText('h5fan-requested', isNaN(requested) ? '-' : Math.round(requested * 100 / 255) + '%');
 		this.setText('h5fan-applied', isNaN(applied) ? (isNaN(pwm) ? '-' : Math.round(pwm * 100 / 255) + '%') : Math.round(applied * 100 / 255) + '%');
