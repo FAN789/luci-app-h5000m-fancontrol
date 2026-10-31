@@ -36,7 +36,7 @@ jobs:
           jq empty root/usr/share/rpcd/acl.d/luci-app-h5000m-fancontrol.json
 
       - name: Validate translations
-        run: msgfmt --check --check-format -o /dev/null po/zh_Hans/h5000m-fancontrol.po
+        run: msgfmt --check --check-format -o /dev/null po/zh_Hans/h5000m-fancontrol.po && msgfmt --check --check-format -o /dev/null po/ru/h5000m-fancontrol.po
 
       - name: Check patch format
         run: git apply --numstat openwrt-patches/h5000m-userspace-fan-control.patch
