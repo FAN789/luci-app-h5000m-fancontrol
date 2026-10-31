@@ -6,6 +6,8 @@ POLICY_FILE="/var/run/h5000m-fancontrol.policy"
 LOCK_DIR="/var/lock/h5000m-fancontrol.lock"
 MT5700M_TEMP_CACHE="${H5000M_FAN_MT5700M_TEMP_CACHE:-/var/run/mt5700m/temperature}"
 MT5700M_TEMP_MAX_AGE="${H5000M_FAN_MT5700M_TEMP_MAX_AGE:-60}"
+FIVEGMODEM_TELE="${H5000M_FAN_5GMODEM_TELE:-/tmp/5gmodem/tele.json}"
+FIVEGMODEM_TELE_MAX_AGE="${H5000M_FAN_5GMODEM_TELE_MAX_AGE:-90}"
 SENSOR_SYSFS_ROOT="${H5000M_FAN_SENSOR_SYSFS_ROOT:-/sys}"
 RADIO_SYSFS_ROOT="${H5000M_FAN_RADIO_SYSFS_ROOT:-/sys/class/net}"
 
@@ -173,6 +175,20 @@ find_module_temp() {
 					''|*[!0-9-]*) ;;
 					*) echo "$value"; return 0 ;;
 				esac
+			fi
+		fi
+	fi
+	if [ -s "$FIVEGMODEM_TELE" ]; then
+		updated="$(date -r "$FIVEGMODEM_TELE" +%s 2>/dev/null || true)"
+		now="$(date +%s)"
+		if is_uint "$updated" && is_uint "$now" && is_uint "$FIVEGMODEM_TELE_MAX_AGE"; then
+			age=$((now - updated))
+			if [ "$age" -ge 0 ] && [ "$age" -le "$FIVEGMODEM_TELE_MAX_AGE" ]; then
+				value="$(sed -n 's/.*"temp":\(-\{0,1\}[0-9][0-9]*\)[,}].*/\1/p' "$FIVEGMODEM_TELE" 2>/dev/null | head -n 1)"
+				if [ -n "$value" ] && [ "$value" -ge -40 ] 2>/dev/null && [ "$value" -le 150 ] 2>/dev/null; then
+					echo "$value"
+					return 0
+				fi
 			fi
 		fi
 	fi
