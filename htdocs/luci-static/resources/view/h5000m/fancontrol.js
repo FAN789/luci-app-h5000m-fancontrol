@@ -67,7 +67,8 @@ return view.extend({
 
 	reasonName: function(reason) {
 		var kernelFloor = (reason || '').indexOf('+kernel-floor') > -1;
-		var base = (reason || '').replace('+kernel-floor', '');
+		var modemFloor = (reason || '').indexOf('+modem-throttle') > -1;
+		var base = (reason || '').replace('+kernel-floor', '').replace('+modem-throttle', '');
 		var text;
 		if (base === 'auto-down-delay') text = _('Waiting before speed down');
 		else if (base === 'auto') text = _('Automatic curve');
@@ -76,6 +77,7 @@ return view.extend({
 		else if (base === 'sensor-failsafe') text = _('Sensor failsafe');
 		else if (base === 'curve-failsafe') text = _('Curve failsafe');
 		else text = base || '-';
+		if (modemFloor) text = _('%s · modem throttling').format(text);
 		return kernelFloor ? _('%s · kernel safety floor').format(text) : text;
 	},
 

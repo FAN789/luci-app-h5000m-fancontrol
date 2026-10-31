@@ -43,4 +43,15 @@ printf 'temperature=43.6\nupdated=%s\n' "$(date +%s)" > "${TMP}/temperature"
 H5000M_FAN_MT5700M_TEMP_CACHE="${TMP}/temperature" H5000M_FAN_5GMODEM_TELE="${tele}" sh "${CONTROLLER}" status 2>/dev/null \
 	| grep -qx 'module_temp=44'
 
+for level in 0 1 2 3; do
+	printf '{"temp":48,"therm":%s}\n' "${level}" > "${tele}"
+	out="$(run_tele)"
+	printf '%s\n' "${out}" | grep -qx "module_therm=${level}"
+	case "${level}" in 0) want=0 ;; 1) want=128 ;; 2) want=192 ;; 3) want=255 ;; esac
+	printf '%s\n' "${out}" | grep -qx "modem_floor=${want}"
+done
+printf '{"temp":48,"therm":3}\n' > "${tele}"
+touch -d "@$(( $(date +%s) - 91 ))" "${tele}"
+run_tele | grep -qx 'modem_floor=0'
+
 echo 'module temperature tests passed'

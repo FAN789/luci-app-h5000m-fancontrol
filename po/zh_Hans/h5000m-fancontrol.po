@@ -339,3 +339,6 @@ msgstr "传感器故障保护"
 
 msgid "Curve failsafe"
 msgstr "曲线故障保护"
+
+msgid "%s · modem throttling"
+msgstr "%s · 模块降频"

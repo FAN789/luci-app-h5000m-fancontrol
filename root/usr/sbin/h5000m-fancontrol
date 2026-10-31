@@ -203,6 +203,27 @@ find_module_temp() {
 	return 1
 }
 
+find_modem_therm() {
+	local updated now value
+	[ -s "$FIVEGMODEM_TELE" ] || return 1
+	updated="$(date -r "$FIVEGMODEM_TELE" +%s 2>/dev/null || true)"
+	now="$(date +%s)"
+	is_uint "$updated" && is_uint "$now" && is_uint "$FIVEGMODEM_TELE_MAX_AGE" || return 1
+	[ $((now - updated)) -ge 0 ] && [ $((now - updated)) -le "$FIVEGMODEM_TELE_MAX_AGE" ] || return 1
+	value="$(sed -n 's/.*"therm":\([0-3]\)[,}].*/\1/p' "$FIVEGMODEM_TELE" 2>/dev/null | head -n 1)"
+	[ -n "$value" ] || return 1
+	echo "$value"
+}
+
+modem_floor() {
+	case "$1" in
+		1) echo 128 ;;
+		2) echo 192 ;;
+		3) echo 255 ;;
+		*) echo 0 ;;
+	esac
+}
+
 max_sensor() {
 	local value="$1" label="$2"
 	[ -n "$value" ] || return 0
@@ -232,6 +253,8 @@ read_sensors() {
 	CPU_TEMP=""; CPU_LABEL=""; PHY_TEMP=""; PHY_LABEL=""
 	WIFI1_TEMP=""; WIFI1_LABEL=""; WIFI2_TEMP=""; WIFI2_LABEL=""
 	MODULE_TEMP="$(find_module_temp 2>/dev/null || true)"
+	MODULE_THERM="$(find_modem_therm 2>/dev/null || true)"
+	MODEM_FLOOR="$(modem_floor "$MODULE_THERM")"
 	CONTROL_TEMP=""; CONTROL_SENSOR=""
 
 	for zone in "$SENSOR_SYSFS_ROOT"/class/thermal/thermal_zone*; do
@@ -510,6 +533,7 @@ apply_once() {
 	REQUESTED_PWM="$(clamp "$REQUESTED_PWM" 0 255)"
 	TARGET_PWM="$REQUESTED_PWM"
 	[ "$THERMAL_FLOOR" -gt "$TARGET_PWM" ] && { TARGET_PWM="$THERMAL_FLOOR"; REASON="${REASON}+kernel-floor"; }
+	[ "$MODEM_FLOOR" -gt "$TARGET_PWM" ] && { TARGET_PWM="$MODEM_FLOOR"; REASON="${REASON}+modem-throttle"; }
 
 	current="$(cat "$PWM_PATH" 2>/dev/null || true)"
 	is_uint "$current" || current=0
@@ -520,6 +544,7 @@ apply_once() {
 		candidate="$(calc_curve_pwm "$((CONTROL_TEMP + HYSTERESIS))" "$CURVE_DATA" 2>/dev/null || echo "$TARGET_PWM")"
 		is_uint "$candidate" || candidate="$TARGET_PWM"
 		[ "$THERMAL_FLOOR" -gt "$candidate" ] && candidate="$THERMAL_FLOOR"
+		[ "$MODEM_FLOOR" -gt "$candidate" ] && candidate="$MODEM_FLOOR"
 		TARGET_PWM="$candidate"
 		DOWN_SINCE="$(state_get down_since)"; is_uint "$DOWN_SINCE" || DOWN_SINCE=0
 		[ "$DOWN_SINCE" -gt 0 ] || DOWN_SINCE="$now"
@@ -604,6 +629,7 @@ print_status() {
 	echo "wifi1_temp=$WIFI1_TEMP"; echo "wifi1_label=$WIFI1_LABEL"
 	echo "wifi2_temp=$WIFI2_TEMP"; echo "wifi2_label=$WIFI2_LABEL"
 	echo "module_temp=$MODULE_TEMP"; echo "module_label=5G modem"
+	echo "module_therm=$MODULE_THERM"; echo "modem_floor=$MODEM_FLOOR"
 	echo "control_temp=$CONTROL_TEMP"; echo "control_sensor=$CONTROL_SENSOR"
 	echo "thermal_floor=$THERMAL_FLOOR"
 	echo "thermal_state=$THERMAL_STATE"
