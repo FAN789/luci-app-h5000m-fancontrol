@@ -23,7 +23,7 @@
 
 ## 功能
 
-- 汇总 CPU、以太网 PHY、Wi-Fi 射频及 MT5700M 管理器提供的新鲜缓存温度
+- 汇总 CPU、以太网 PHY、Wi-Fi 射频及 MT5700M 管理器或 luci-app-5gmodem 提供的新鲜缓存温度；luci-app-5gmodem 报告的模组降频等级（1/2/3）会把风扇输出至少提高到 50%/75%/100%
 - 静音、均衡、性能和自定义四种自动曲线
 - 自动、手动和仅内核保护三种运行模式
 - 温度滞回及降速延迟，减少风扇频繁波动
@@ -95,3 +95,9 @@ git apply package/luci-app-h5000m-fancontrol/openwrt-patches/h5000m-userspace-fa
 ## 许可证
 
 [Apache License 2.0](LICENSE)
+
+## Modem telemetry validation
+
+The optional `/tmp/5gmodem/tele.json` source is parsed with `jq` (an explicit package dependency). Only one complete JSON object is accepted. Only top-level numeric integer values are used: `temp` in -40–150 °C and `therm` in 0–3. Whitespace and pretty-printed JSON are supported; strings, booleans, null, fractional/out-of-range values, nested fields and invalid documents do not supply readings. Missing or invalid fields are ignored independently. Files older than 90 seconds or dated in the future are ignored. Temperature priority remains MT5700M cache, 5gmodem telemetry, QModem cache.
+
+Throttling levels 1/2/3 set minimum PWM 128/192/255 only while the app controls the fan. Kernel-only and disabled modes leave the current PWM untouched. The existing kernel cooling floor always takes priority when it exceeds the modem minimum. Tests use an isolated fake sysfs/PWM fixture and execute the actual apply path; this is not a hardware validation.

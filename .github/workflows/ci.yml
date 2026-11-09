@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install validation tools
-        run: sudo apt-get update && sudo apt-get install -y gettext
+        run: sudo apt-get update && sudo apt-get install -y gettext jq busybox bsdextrautils
 
       - name: Check shell syntax
         run: |
@@ -24,6 +24,9 @@ jobs:
           sh -n root/etc/uci-defaults/91-h5000m-fancontrol-v2
           sh -n scripts/build-release.sh
           sh tests/test-module-temperature.sh
+          sh tests/test-modem-pwm.sh
+          busybox ash tests/test-module-temperature.sh
+          busybox ash tests/test-modem-pwm.sh
           sh tests/test-vendor-temperature.sh
           sh tests/test-thermal-policy-safety.sh
 
