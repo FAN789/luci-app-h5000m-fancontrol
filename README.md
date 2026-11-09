@@ -95,3 +95,9 @@ git apply package/luci-app-h5000m-fancontrol/openwrt-patches/h5000m-userspace-fa
 ## 许可证
 
 [Apache License 2.0](LICENSE)
+
+## Modem telemetry validation
+
+The optional `/tmp/5gmodem/tele.json` source is parsed with `jq` (an explicit package dependency). Only one complete JSON object is accepted. Only top-level numeric integer values are used: `temp` in -40–150 °C and `therm` in 0–3. Whitespace and pretty-printed JSON are supported; strings, booleans, null, fractional/out-of-range values, nested fields and invalid documents do not supply readings. Missing or invalid fields are ignored independently. Files older than 90 seconds or dated in the future are ignored. Temperature priority remains MT5700M cache, 5gmodem telemetry, QModem cache.
+
+Throttling levels 1/2/3 set minimum PWM 128/192/255 only while the app controls the fan. Kernel-only and disabled modes leave the current PWM untouched. The existing kernel cooling floor always takes priority when it exceeds the modem minimum. Tests use an isolated fake sysfs/PWM fixture and execute the actual apply path; this is not a hardware validation.

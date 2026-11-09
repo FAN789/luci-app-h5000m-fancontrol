@@ -178,20 +178,8 @@ find_module_temp() {
 			fi
 		fi
 	fi
-	if [ -s "$FIVEGMODEM_TELE" ]; then
-		updated="$(date -r "$FIVEGMODEM_TELE" +%s 2>/dev/null || true)"
-		now="$(date +%s)"
-		if is_uint "$updated" && is_uint "$now" && is_uint "$FIVEGMODEM_TELE_MAX_AGE"; then
-			age=$((now - updated))
-			if [ "$age" -ge 0 ] && [ "$age" -le "$FIVEGMODEM_TELE_MAX_AGE" ]; then
-				value="$(sed -n 's/.*"temp":\(-\{0,1\}[0-9][0-9]*\)[,}].*/\1/p' "$FIVEGMODEM_TELE" 2>/dev/null | head -n 1)"
-				if [ -n "$value" ] && [ "$value" -ge -40 ] 2>/dev/null && [ "$value" -le 150 ] 2>/dev/null; then
-					echo "$value"
-					return 0
-				fi
-			fi
-		fi
-	fi
+	value="$(read_modem_telemetry temp -40 150 2>/dev/null || true)"
+	[ -z "$value" ] || { echo "$value"; return 0; }
 	for file in /tmp/cache_base_info_* /tmp/cache_*info*; do
 		[ -f "$file" ] || continue
 		value="$(sed -n 's/.*"key"[[:space:]]*:[[:space:]]*"temperature"[^}]*"value"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$file" 2>/dev/null | head -n 1 | grep -Eo -- '-?[0-9]+' | head -n 1)"
@@ -203,16 +191,23 @@ find_module_temp() {
 	return 1
 }
 
-find_modem_therm() {
-	local updated now value
+read_modem_telemetry() {
+	local field="$1" min="$2" max="$3" updated now age
 	[ -s "$FIVEGMODEM_TELE" ] || return 1
 	updated="$(date -r "$FIVEGMODEM_TELE" +%s 2>/dev/null || true)"
 	now="$(date +%s)"
 	is_uint "$updated" && is_uint "$now" && is_uint "$FIVEGMODEM_TELE_MAX_AGE" || return 1
-	[ $((now - updated)) -ge 0 ] && [ $((now - updated)) -le "$FIVEGMODEM_TELE_MAX_AGE" ] || return 1
-	value="$(sed -n 's/.*"therm":\([0-3]\)[,}].*/\1/p' "$FIVEGMODEM_TELE" 2>/dev/null | head -n 1)"
-	[ -n "$value" ] || return 1
-	echo "$value"
+	age=$((now - updated))
+	[ "$age" -ge 0 ] && [ "$age" -le "$FIVEGMODEM_TELE_MAX_AGE" ] || return 1
+	jq -ers --arg field "$field" --argjson min "$min" --argjson max "$max" '
+		select(length == 1) | .[0] | select(type == "object") |
+		.[$field] | select(type == "number") |
+		select(. >= $min and . <= $max and floor == .)
+	' "$FIVEGMODEM_TELE" 2>/dev/null
+}
+
+find_modem_therm() {
+	read_modem_telemetry therm 0 3
 }
 
 modem_floor() {
