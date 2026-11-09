@@ -273,7 +273,7 @@ read_sensors() {
 			*cpu*|*soc*|*mt798*|*thermal*)
 				[ -n "$CPU_TEMP" ] || { CPU_TEMP="$value"; CPU_LABEL="$name"; }
 				;;
-			*mt799*|*wifi*|*radio*)
+			*mt791*|*mt799*|*wifi*|*radio*)
 				if [ -z "$WIFI1_TEMP" ]; then
 					WIFI1_TEMP="$value"; WIFI1_LABEL="$name"
 				elif [ -z "$WIFI2_TEMP" ]; then

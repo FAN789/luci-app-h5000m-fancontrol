@@ -36,11 +36,12 @@ CONFIG_TARGET_mediatek_filogic=y
 # CONFIG_ALL_NONSHARED is not set
 CONFIG_PACKAGE_luci-app-h5000m-fancontrol=m
 CONFIG_LUCI_LANG_zh_Hans=y
+CONFIG_LUCI_LANG_ru=y
 EOF
 make defconfig
 make package/h5000m-custom/luci-app-h5000m-fancontrol/compile -j"$(nproc)" V=s
 
-find bin -type f \( -name 'luci-app-h5000m-fancontrol-*.apk' -o -name 'luci-app-h5000m-fancontrol_*.ipk' -o -name 'luci-i18n-h5000m-fancontrol-zh-cn-*.apk' -o -name 'luci-i18n-h5000m-fancontrol-zh-cn_*.ipk' \) -exec cp -f {} "${output_dir}/" \;
+find bin -type f \( -name 'luci-app-h5000m-fancontrol-*.apk' -o -name 'luci-app-h5000m-fancontrol_*.ipk' -o -name 'luci-i18n-h5000m-fancontrol-zh-cn-*.apk' -o -name 'luci-i18n-h5000m-fancontrol-zh-cn_*.ipk' -o -name 'luci-i18n-h5000m-fancontrol-ru-*.apk' -o -name 'luci-i18n-h5000m-fancontrol-ru_*.ipk' \) -exec cp -f {} "${output_dir}/" \;
 test "$(find "${output_dir}" -type f \( -name '*.apk' -o -name '*.ipk' \) | wc -l)" -ge 2
 if find "${output_dir}" -name '*.apk' | grep -q .; then
   cp public-key.pem "${output_dir}/openwrt-sdk-build.pem"

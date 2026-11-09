@@ -1,0 +1,359 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Fan Control"
+msgstr "Управление вентилятором"
+
+msgid "Adjust the PWM fan policy."
+msgstr "Настройка PWM-вентилятора."
+
+msgid "Current Status"
+msgstr "Текущее состояние"
+
+msgid "Fan Speed"
+msgstr "Скорость вентилятора"
+
+msgid "Current PWM"
+msgstr "Текущий PWM"
+
+msgid "Modem Temperature"
+msgstr "Температура модема"
+
+msgid "CPU Temperature"
+msgstr "Температура CPU"
+
+msgid "WiFi Temperature 1"
+msgstr "Температура Wi-Fi 1"
+
+msgid "WiFi Temperature 2"
+msgstr "Температура Wi-Fi 2"
+
+msgid "Unknown"
+msgstr "Неизвестно"
+
+msgid "PWM percentage unavailable"
+msgstr "Процент PWM недоступен"
+
+msgid "PWM node not found"
+msgstr "Узел PWM не найден"
+
+msgid "From QModem cache"
+msgstr "Из кэша QModem"
+
+msgid "Fan Curve"
+msgstr "Кривая вентилятора"
+
+msgid "Auto Curve"
+msgstr "Авто-кривая"
+
+msgid "Manual PWM"
+msgstr "Ручной PWM"
+
+msgid "Temperature"
+msgstr "Температура"
+
+msgid "Temperature Range"
+msgstr "Диапазон температур"
+
+msgid "PWM Range"
+msgstr "Диапазон PWM"
+
+msgid "Manual mode: the slider value is used as a fixed PWM output."
+msgstr "Ручной режим: значение ползунка задаёт постоянный выход PWM."
+
+msgid "Off mode: fan PWM output is set to 0."
+msgstr "Режим «Выкл.»: выход PWM вентилятора равен 0."
+
+msgid "Auto mode: low temperatures use the minimum PWM, high temperatures use the maximum PWM, and values in between increase linearly."
+msgstr "Автоматический режим: при низкой температуре — минимальный PWM, при высокой — максимальный, между ними растёт линейно."
+
+msgid "Enable"
+msgstr "Включить"
+
+msgid "Mode"
+msgstr "Режим"
+
+msgid "Auto"
+msgstr "Авто"
+
+msgid "Manual"
+msgstr "Вручную"
+
+msgid "Off"
+msgstr "Выкл."
+
+msgid "Minimum PWM"
+msgstr "Минимальный PWM"
+
+msgid "Maximum PWM"
+msgstr "Максимальный PWM"
+
+msgid "Low Temperature Threshold"
+msgstr "Нижний порог температуры"
+
+msgid "High Temperature Threshold"
+msgstr "Верхний порог температуры"
+
+msgid "Refresh Interval"
+msgstr "Интервал обновления"
+
+msgid "Fan control has been applied."
+msgstr "Управление вентилятором применено."
+
+msgid "Failed to apply fan control:"
+msgstr "Не удалось применить управление вентилятором:"
+
+msgid "%s / 255 · %s%%"
+msgstr "%s / 255 · %s%%"
+
+msgid "%s °C"
+msgstr "%s °C"
+
+msgid "5G modem"
+msgstr "5G-модем"
+
+msgid "A short boost helps a stopped fan start reliably. Set 0 to disable."
+msgstr "Короткий разгон помогает остановленному вентилятору надёжно стартовать. 0 — выключить."
+
+msgid "Applied output"
+msgstr "Применённый выход"
+
+msgid "Control ownership"
+msgstr "Кто управляет"
+
+msgid "Fan manager"
+msgstr "Менеджер вентилятора"
+
+msgid "Exclusive fan policy control"
+msgstr "Монопольное управление вентилятором"
+
+msgid "The fan manager has exclusive fan policy control. Kernel CPU throttling and hot/critical over-temperature protection remain active."
+msgstr "Менеджер вентилятора управляет политикой вентилятора монопольно. Троттлинг CPU в ядре и защита ядра от перегрева (hot/critical) остаются в силе."
+
+msgid "Automatic"
+msgstr "Автоматически"
+
+msgid "Balanced"
+msgstr "Сбалансированный"
+
+msgid "CPU"
+msgstr "CPU"
+
+msgid "CPU only"
+msgstr "Только CPU"
+
+msgid "Checking service…"
+msgstr "Проверка службы…"
+
+msgid "Choose a cooling profile or set a manual output. Safety limits remain active in every mode."
+msgstr "Выберите профиль охлаждения или задайте выход вручную. Защитные ограничения действуют в любом режиме."
+
+msgid "Comma-separated temperature:percent points. The controller interpolates between points."
+msgstr "Точки «температура:процент» через запятую. Между точками значение интерполируется."
+
+msgid "Control interval"
+msgstr "Интервал управления"
+
+msgid "Control temperature"
+msgstr "Управляющая температура"
+
+msgid "Current input: %s"
+msgstr "Текущий вход: %s"
+
+msgid "Controller running · updated %ss ago"
+msgstr "Контроллер работает · обновлено %s с назад"
+
+msgid "Controller status is stale"
+msgstr "Статус контроллера устарел"
+
+msgid "Cooling management"
+msgstr "Управление охлаждением"
+
+msgid "Automatically balances cooling and noise based on device temperatures."
+msgstr "Автоматически балансирует охлаждение и шум по температурам устройства."
+
+msgid "Checking…"
+msgstr "Проверка…"
+
+msgid "Cooling policy"
+msgstr "Политика охлаждения"
+
+msgid "Cooling policy applied successfully."
+msgstr "Политика охлаждения применена."
+
+msgid "Cooling profile"
+msgstr "Профиль охлаждения"
+
+msgid "Cooling state %s / %s"
+msgstr "Состояние охлаждения %s / %s"
+
+msgid "Custom"
+msgstr "Свой"
+
+msgid "Custom curve"
+msgstr "Своя кривая"
+
+msgid "Effective fan policy"
+msgstr "Действующая политика вентилятора"
+
+msgid "Enable enhanced controller"
+msgstr "Включить расширенный контроллер"
+
+msgid "Ethernet PHY"
+msgstr "Ethernet PHY"
+
+msgid "Failed to apply cooling policy:"
+msgstr "Не удалось применить политику охлаждения:"
+
+msgid "Failsafe active · full cooling"
+msgstr "Аварийный режим · максимальное охлаждение"
+
+msgid "Failsafe cooling"
+msgstr "Аварийное охлаждение"
+
+msgid "Status delayed"
+msgstr "Статус запаздывает"
+
+msgid "Running normally"
+msgstr "Работает нормально"
+
+msgid "Fan output"
+msgstr "Выход вентилятора"
+
+msgid "From the local modem cache"
+msgstr "Из локального кэша модема"
+
+msgid "H5000M Cooling"
+msgstr "Охлаждение H5000M"
+
+msgid "Hottest available sensor"
+msgstr "Самый горячий доступный датчик"
+
+msgid "Kernel protection only"
+msgstr "Только защита ядра"
+
+msgid "Kernel safety floor"
+msgstr "Минимум от ядра"
+
+msgid "Kernel thermal protection is always retained. Requested output may be raised automatically when the kernel requires more cooling."
+msgstr "Защита ядра от перегрева действует всегда. Запрошенный выход может автоматически повышаться, если ядру нужно больше охлаждения."
+
+msgid "Live fan policy, temperature sensors and kernel safety protection."
+msgstr "Текущая политика вентилятора, датчики температуры и защита ядра."
+
+msgid "Loading…"
+msgstr "Загрузка…"
+
+msgid "Manual PWM output"
+msgstr "Ручной выход PWM"
+
+msgid "No tachometer signal is exposed by the hardware/driver"
+msgstr "Аппаратура или драйвер не отдают сигнал тахометра"
+
+msgid "No valid sensor"
+msgstr "Нет исправного датчика"
+
+msgid "Not supported"
+msgstr "Не поддерживается"
+
+msgid "Operating mode"
+msgstr "Режим работы"
+
+msgid "Performance"
+msgstr "Производительный"
+
+msgid "Policy"
+msgstr "Политика"
+
+msgid "Policy reason"
+msgstr "Причина политики"
+
+msgid "Prevents repeated speed changes around a curve point."
+msgstr "Не даёт скорости скакать около точки кривой."
+
+msgid "Quiet"
+msgstr "Тихий"
+
+msgid "Requested output"
+msgstr "Запрошенный выход"
+
+msgid "Response & safety"
+msgstr "Отклик и безопасность"
+
+msgid "Seconds between control decisions. The dashboard refreshes independently."
+msgstr "Секунды между решениями контроллера. Панель обновляется независимо."
+
+msgid "Speed-down delay"
+msgstr "Задержка снижения скорости"
+
+msgid "Startup boost PWM"
+msgstr "PWM стартового разгона"
+
+msgid "Startup boost duration"
+msgstr "Длительность стартового разгона"
+
+msgid "Temperature hysteresis"
+msgstr "Гистерезис температуры"
+
+msgid "Temperatures must increase from 0–150 °C and percentages must be 0–100."
+msgstr "Температуры должны расти в пределах 0–150 °C, проценты — 0–100."
+
+msgid "The hottest-sensor option considers CPU, Ethernet PHY, Wi-Fi and the available 5G modem cache."
+msgstr "Вариант «самый горячий датчик» учитывает CPU, Ethernet PHY, Wi-Fi и доступный кэш 5G-модема."
+
+msgid "The kernel safety floor may raise the effective output above this value."
+msgstr "Минимум от ядра может поднять действующий выход выше этого значения."
+
+msgid "Unavailable"
+msgstr "Недоступно"
+
+msgid "Use comma-separated temperature:percent points, for example 35:0,45:50,70:80,90:100."
+msgstr "Точки «температура:процент» через запятую, например 35:0,45:50,70:80,90:100."
+
+msgid "Wait this many seconds before lowering fan output; temperature increases are applied immediately."
+msgstr "Сколько секунд ждать перед снижением оборотов; рост температуры применяется сразу."
+
+msgid "When disabled, the fan follows the kernel thermal protection level only."
+msgstr "Если выключено, вентилятор следует только уровню защиты ядра."
+
+msgid "Wi-Fi radios"
+msgstr "Радиомодули Wi-Fi"
+
+msgid "%s · kernel safety floor"
+msgstr "%s · минимум от ядра"
+
+msgid "Waiting before speed down"
+msgstr "Ожидание перед снижением скорости"
+
+msgid "Automatic curve"
+msgstr "Автоматическая кривая"
+
+msgid "Manual request"
+msgstr "Ручной запрос"
+
+msgid "Kernel protection"
+msgstr "Защита ядра"
+
+msgid "Sensor failsafe"
+msgstr "Аварийный режим датчиков"
+
+msgid "Curve failsafe"
+msgstr "Аварийный режим кривой"
+
+msgid "%s · modem throttling"
+msgstr "%s · троттлинг модема"
+
+msgid "Normal"
+msgstr "Норма"
+
+msgid "Warm"
+msgstr "Тёплый"
+
+msgid "Hot"
+msgstr "Горячий"
+
+msgid "Critical"
+msgstr "Критично"
+
+msgid "Throttling level %s / 3"
+msgstr "Уровень троттлинга %s / 3"
