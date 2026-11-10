@@ -4,7 +4,8 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 work_dir="${RUNNER_TEMP:-/tmp}/h5000m-fan-sdk"
 output_dir="${repo_dir}/dist-release"
-base_url="https://downloads.openwrt.org/snapshots/targets/mediatek/filogic"
+sdk_version=25.12.6
+base_url="https://downloads.openwrt.org/releases/${sdk_version}/targets/mediatek/filogic"
 
 mkdir -p "${work_dir}" "${output_dir}"
 find "${output_dir}" -mindepth 1 -maxdepth 1 -delete
@@ -42,7 +43,14 @@ make defconfig
 make package/h5000m-custom/luci-app-h5000m-fancontrol/compile -j"$(nproc)" V=s
 
 find bin -type f \( -name 'luci-app-h5000m-fancontrol-*.apk' -o -name 'luci-app-h5000m-fancontrol_*.ipk' -o -name 'luci-i18n-h5000m-fancontrol-zh-cn-*.apk' -o -name 'luci-i18n-h5000m-fancontrol-zh-cn_*.ipk' -o -name 'luci-i18n-h5000m-fancontrol-ru-*.apk' -o -name 'luci-i18n-h5000m-fancontrol-ru_*.ipk' \) -exec cp -f {} "${output_dir}/" \;
-test "$(find "${output_dir}" -type f \( -name '*.apk' -o -name '*.ipk' \) | wc -l)" -ge 2
+version="$(sed -n 's/^PKG_VERSION:=//p' "${repo_dir}/Makefile")"
+revision="$(sed -n 's/^PKG_RELEASE:=//p' "${repo_dir}/Makefile")"
+test -s "${output_dir}/luci-app-h5000m-fancontrol-${version}-r${revision}.apk"
+for language in zh-cn ru; do
+  set -- "${output_dir}"/luci-i18n-h5000m-fancontrol-"${language}"-*.apk
+  test "$#" -eq 1
+  test -s "$1"
+done
 if find "${output_dir}" -name '*.apk' | grep -q .; then
   cp public-key.pem "${output_dir}/openwrt-sdk-build.pem"
   mkdir -p "${work_dir}/verification-keys"
@@ -53,6 +61,6 @@ if find "${output_dir}" -name '*.apk' | grep -q .; then
     staging_dir/host/bin/apk --keys-dir "${work_dir}/verification-keys" verify "$package"
   done
 fi
-printf 'SDK=snapshot\nSOURCE_COMMIT=%s\nTARGET=mediatek/filogic\n' "$(git -C "$repo_dir" rev-parse HEAD)" > "${output_dir}/BUILD-INFO.txt"
+printf 'SDK=%s\nSOURCE_COMMIT=%s\nTARGET=mediatek/filogic\n' "${sdk_version}" "$(git -C "$repo_dir" rev-parse HEAD)" > "${output_dir}/BUILD-INFO.txt"
 grep "[ *]${archive}$" "${work_dir}/sha256sums" >> "${output_dir}/BUILD-INFO.txt"
 (cd "${output_dir}" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)

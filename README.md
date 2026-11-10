@@ -9,7 +9,13 @@
 > H5000M fan manager for OpenWrt with temperature-aware profiles, manual PWM control, hysteresis, delayed spin-down, start boost and sensor failsafe protection.
 
 版本采用标准的 `主版本.次版本.修订版本-r打包修订` 格式。GitHub Release 仅使用
-语义版本标签（当前为 `v2.1.1`），OpenWrt 安装包版本为 `2.1.1-r1`。
+语义版本标签（当前为 `v2.1.2`），OpenWrt 安装包版本为 `2.1.2-r1`。
+
+## 2.1.2 更新
+
+- 识别 MT7915 和 MT7916 的 hwmon 射频温度，避免将 `mt7915_phy0` 归入以太网 PHY（#5）。
+- 提供独立的俄语 LuCI 语言包（#4）。
+- 发布使用 OpenWrt 25.12.6 mediatek/filogic SDK，构建主包、简体中文包和俄语包。
 
 ## 2.1.1 更新
 
