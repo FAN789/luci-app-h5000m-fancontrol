@@ -46,7 +46,7 @@ check() {
 }
 for TEST_MODE in manual auto; do
  export TEST_MODE
- for pair in '0 32' '1 128' '2 192' '3 255'; do
+ for pair in '0 32' '1 128' '2 192' '3 255' '2.0 192' '3.0 255'; do
   set -- $pair
   printf '{"therm": %s}\n' "$1" > "$FIVEGMODEM_TELE"
   if [ "$TEST_MODE" = auto ] && [ "$1" = 0 ]; then check 0; else check "$2"; fi

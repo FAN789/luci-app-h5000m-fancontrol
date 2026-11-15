@@ -202,7 +202,7 @@ read_modem_telemetry() {
 	jq -ers --arg field "$field" --argjson min "$min" --argjson max "$max" '
 		select(length == 1) | .[0] | select(type == "object") |
 		.[$field] | select(type == "number") |
-		select(. >= $min and . <= $max and floor == .)
+		select(. >= $min and . <= $max and floor == .) | floor
 	' "$FIVEGMODEM_TELE" 2>/dev/null
 }
 

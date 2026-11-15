@@ -58,6 +58,11 @@ printf '{\n  "temp": 48,\n  "therm": 3\n}\n' > "${tele}"
 run_tele | grep -qx 'module_temp=48'
 run_tele | grep -qx 'modem_floor=255'
 
+printf '{"temp":48.0,"therm":3.0}\n' > "${tele}"
+out="$(run_tele)"
+printf '%s\n' "${out}" | grep -qx 'module_temp=48'
+printf '%s\n' "${out}" | grep -qx 'module_therm=3'
+
 for payload in \
  '{"nested":{"temp":48,"therm":3}}' \
  '{"temp":48,"therm":3' \
