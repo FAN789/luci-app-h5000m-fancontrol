@@ -7,7 +7,7 @@ PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
 
 LUCI_TITLE:=H5000M fan control
-LUCI_DEPENDS:=+luci-base +kmod-hwmon-pwmfan
+LUCI_DEPENDS:=+luci-base +kmod-hwmon-pwmfan +jq
 LUCI_PKGARCH:=all
 
 define Package/luci-app-h5000m-fancontrol/conffiles
