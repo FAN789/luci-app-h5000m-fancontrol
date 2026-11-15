@@ -21,7 +21,7 @@ test -n "${sdk_dir}"
 
 cd "${sdk_dir}"
 ./scripts/feeds update -a
-./scripts/feeds install luci-base
+./scripts/feeds install luci-base jq
 
 perl -0pi -e 's/(config ALL\n\s+bool "Select all userspace packages by default"\n\s+default )y/${1}n/' Config.in
 perl -0pi -e 's/(config TARGET_MULTI_PROFILE\n\s+bool\n\s+default )y/${1}n/; s/(config TARGET_ALL_PROFILES\n\s+bool\n\s+default )y/${1}n/; s/(config TARGET_DEVICE_mediatek_filogic_DEVICE_[^\n]+\n\s+bool\n\s+default )y/${1}n/g' Config-build.in

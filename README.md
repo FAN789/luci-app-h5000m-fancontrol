@@ -9,7 +9,13 @@
 > H5000M fan manager for OpenWrt with temperature-aware profiles, manual PWM control, hysteresis, delayed spin-down, start boost and sensor failsafe protection.
 
 版本采用标准的 `主版本.次版本.修订版本-r打包修订` 格式。GitHub Release 仅使用
-语义版本标签（当前为 `v2.1.2`），OpenWrt 安装包版本为 `2.1.2-r1`。
+语义版本标签（当前为 `v2.1.3`），OpenWrt 安装包版本为 `2.1.3-r1`。
+
+## 2.1.3 更新
+
+- 可选读取 `luci-app-5gmodem` 的本地温度和降频数据（#3）。降频级别 1、2、3 分别对应 PWM 下限 128、192、255。
+- JSON 数值 `2.0` 和 `3.0` 分别按整数 2、3 处理。自动与手动模式均测试了 PWM 写入，内核散热下限仍可提高实际输出。
+- 软件包依赖 `jq`，继续使用 OpenWrt 25.12.6 mediatek/filogic SDK 构建。
 
 ## 2.1.2 更新
 
@@ -41,7 +47,7 @@
 ## 兼容性
 
 - Hiveton H5000M
-- OpenWrt SNAPSHOT（基于 LuCI JavaScript 视图）
+- OpenWrt 25.12 系列（基于 LuCI JavaScript 视图）
 - `pwm-fan` 驱动及 `/sys/class/hwmon/*/pwm1` 控制节点
 
 本项目针对 H5000M 的设备树和传感器布局设计。其他设备即使能够安装，也不建议直接使用。
@@ -61,7 +67,7 @@ make package/luci-app-h5000m-fancontrol/compile V=s
 ```
 
 GitHub Releases 中的预编译 `.apk` 由 GitHub Actions 使用官方 OpenWrt
-SNAPSHOT `mediatek/filogic` SDK 构建，适用于同一 ABI 的近期 SNAPSHOT。Release
+25.12.6 `mediatek/filogic` SDK 构建。Release
 同时提供构建公钥和 SHA256 校验文件。由于风扇安全策略依赖设备树，建议把本项目
 集成进固件并同时评估下方补丁，而不是只安装软件包。
 
